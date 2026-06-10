@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BA Analysis Toolkit — Sanjay Prakash Ravi</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        :root { --bg:#0d1117;--surface:#161b22;--surface-2:#1e2630;--border:#30363d;--text:#e6edf3;--text-dim:#8b949e;--accent:#58a6ff;--accent-soft:rgba(88,166,255,0.1);--green:#3fb950;--amber:#d29922;--red:#f85149;--purple:#a371f7; }
+        body { font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; background:var(--bg); background-image:radial-gradient(ellipse at top,rgba(88,166,255,0.03) 0%,transparent 60%); color:var(--text); line-height:1.6; min-height:100vh; }
+        .container { max-width:960px; margin:0 auto; padding:2rem 1.5rem; }
+        header { text-align:center; margin-bottom:2rem; }
+        header h1 { font-size:1.75rem; font-weight:700; letter-spacing:-0.5px; }
+        header h1 span { color:var(--accent); }
+        header p { color:var(--text-dim); font-size:0.9rem; }
+        .badge { display:inline-block; background:linear-gradient(135deg,rgba(88,166,255,0.12),rgba(163,113,247,0.12)); color:var(--accent); padding:0.3rem 0.9rem; border-radius:20px; font-size:0.73rem; font-weight:500; margin-top:0.5rem; border:1px solid rgba(88,166,255,0.2); }
+
+        /* Tabs */
+        .tabs { display:flex; gap:0; margin-bottom:1.5rem; border-bottom:1px solid var(--border); padding-bottom:0; }
+        .tab { padding:0.7rem 1.2rem; cursor:pointer; font-size:0.82rem; font-weight:500; color:var(--text-dim); border-bottom:2px solid transparent; transition:all 0.3s ease; }
+        .tab:hover { color:var(--text); background:var(--accent-soft); border-radius:8px 8px 0 0; }
+        .tab.active { color:var(--accent); border-bottom-color:var(--accent); }
+        .tab-content { display:none; }
+        .tab-content.active { display:block; }
+
+        /* Input Section */
+        .input-section { background:var(--surface); border:1px solid var(--border); border-radius:16px; padding:1.75rem; margin-bottom:1.5rem; box-shadow:0 4px 24px rgba(0,0,0,0.2); }
+        .input-section label { display:block; font-weight:600; font-size:0.85rem; margin-bottom:0.5rem; color:var(--text-dim); text-transform:uppercase; letter-spacing:0.5px; }
+        .context-row { display:grid; grid-template-columns:1fr 1fr 1fr; gap:0.75rem; margin-bottom:1rem; }
+        .context-row select { width:100%; padding:0.6rem 0.75rem; background:var(--surface-2); border:1px solid var(--border); border-radius:8px; color:var(--text); font-size:0.82rem; font-family:inherit; cursor:pointer; }
+        .context-row select:focus { outline:none; border-color:var(--accent); }
+        textarea { width:100%; min-height:110px; background:var(--surface-2); border:1px solid var(--border); border-radius:8px; padding:1rem; color:var(--text); font-size:0.9rem; font-family:inherit; resize:vertical; }
+        textarea:focus { outline:none; border-color:var(--accent); }
+        textarea::placeholder { color:#52525b; }
+
+        .analysis-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(130px,1fr)); gap:0.6rem; margin-top:1rem; }
+        .analysis-btn { background:var(--surface-2); border:1px solid var(--border); border-radius:10px; padding:0.7rem; cursor:pointer; transition:all 0.25s ease; text-align:left; }
+        .analysis-btn:hover { border-color:var(--accent); background:var(--accent-soft); transform:translateY(-2px); box-shadow:0 4px 12px rgba(88,166,255,0.1); }
+        .analysis-btn:disabled { opacity:0.5; cursor:not-allowed; }
+        .analysis-btn .icon { font-size:1rem; }
+        .analysis-btn .label { font-size:0.75rem; font-weight:600; color:var(--text); }
+        .analysis-btn .desc { font-size:0.65rem; color:var(--text-dim); }
+        .run-all { grid-column:1/-1; background:linear-gradient(135deg,#58a6ff,#a371f7); border-color:transparent; text-align:center; padding:0.8rem; font-weight:600; color:white; border-radius:10px; }
+        .run-all:hover { opacity:0.9; transform:translateY(-1px); }
+
+        .toolbar { display:flex; gap:0.5rem; margin-top:1rem; flex-wrap:wrap; }
+        .toolbar button { background:var(--surface-2); border:1px solid var(--border); border-radius:6px; padding:0.45rem 0.9rem; color:var(--text-dim); font-size:0.75rem; cursor:pointer; transition:all 0.2s; font-family:inherit; }
+        .toolbar button:hover { border-color:var(--accent); color:var(--text); }
+
+        /* Results */
+        .results { margin-top:1.5rem; }
+        .result-card { background:var(--surface); border:1px solid var(--border); border-radius:14px; margin-bottom:1rem; overflow:hidden; box-shadow:0 2px 12px rgba(0,0,0,0.15); transition:border-color 0.2s; }
+        .result-card:hover { border-color:var(--accent); }
+        .result-card .card-header { padding:0.8rem 1.2rem; border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; font-weight:600; font-size:0.82rem; }
+        .card-header-left { display:flex; align-items:center; gap:0.5rem; }
+        .card-actions { display:flex; gap:0.3rem; }
+        .card-actions button { background:var(--surface-2); border:1px solid var(--border); border-radius:5px; padding:0.25rem 0.5rem; color:var(--text-dim); font-size:0.68rem; cursor:pointer; font-family:inherit; }
+        .card-actions button:hover { border-color:var(--accent); color:var(--text); }
+        .result-card .card-body { padding:1.2rem; font-size:0.85rem; line-height:1.8; }
+        .result-card .card-body h3 { color:var(--accent); margin:1rem 0 0.5rem; font-size:0.88rem; }
+        .result-card .card-body table { width:100%; border-collapse:collapse; margin:0.75rem 0; font-size:0.78rem; }
+        .result-card .card-body th { background:var(--surface-2); padding:0.45rem 0.5rem; text-align:left; border:1px solid var(--border); font-weight:600; color:var(--accent); font-size:0.72rem; text-transform:uppercase; }
+        .result-card .card-body td { padding:0.4rem 0.5rem; border:1px solid var(--border); }
+        .result-card .card-body tr:hover td { background:var(--accent-soft); }
+        .result-card .card-body li { margin-bottom:0.2rem; margin-left:1.2rem; }
+        .summary-card { background:linear-gradient(135deg,rgba(88,166,255,0.06),rgba(163,113,247,0.06)); border:1px solid rgba(88,166,255,0.3); }
+
+        .loading { display:flex; align-items:center; gap:0.5rem; padding:1.2rem; color:var(--text-dim); font-size:0.82rem; }
+        .spinner { width:14px; height:14px; border:2px solid var(--border); border-top-color:var(--accent); border-radius:50%; animation:spin 0.7s linear infinite; }
+        @keyframes spin { to { transform:rotate(360deg); } }
+
+        /* Comparison Mode */
+        .compare-row { display:grid; grid-template-columns:1fr 1fr; gap:1rem; margin-bottom:1rem; }
+        .compare-row textarea { min-height:80px; }
+
+        /* Visual Charts */
+        .tam-visual { display:flex; align-items:center; justify-content:center; padding:1.5rem; }
+        .tam-circles { position:relative; width:220px; height:220px; }
+        .tam-circle { position:absolute; border-radius:50%; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:0.7rem; text-align:center; }
+        .tam-circle.tam { width:220px; height:220px; background:rgba(59,130,246,0.15); border:2px solid var(--accent); top:0; left:0; }
+        .tam-circle.sam { width:150px; height:150px; background:rgba(139,92,246,0.2); border:2px solid var(--purple); top:35px; left:35px; }
+        .tam-circle.som { width:80px; height:80px; background:rgba(16,185,129,0.25); border:2px solid var(--green); top:70px; left:70px; }
+
+        .swot-grid { display:grid; grid-template-columns:1fr 1fr; gap:2px; background:var(--border); border-radius:8px; overflow:hidden; margin:1rem 0; }
+        .swot-quad { padding:0.8rem; font-size:0.75rem; }
+        .swot-quad h4 { font-size:0.7rem; text-transform:uppercase; margin-bottom:0.4rem; letter-spacing:0.5px; }
+        .swot-quad.s { background:rgba(16,185,129,0.1); }
+        .swot-quad.s h4 { color:var(--green); }
+        .swot-quad.w { background:rgba(239,68,68,0.1); }
+        .swot-quad.w h4 { color:var(--red); }
+        .swot-quad.o { background:rgba(59,130,246,0.1); }
+        .swot-quad.o h4 { color:var(--accent); }
+        .swot-quad.t { background:rgba(245,158,11,0.1); }
+        .swot-quad.t h4 { color:var(--amber); }
+
+        /* History Panel */
+        .history-panel { background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:1.2rem; }
+        .history-item { padding:0.6rem; border:1px solid var(--border); border-radius:8px; margin-bottom:0.5rem; cursor:pointer; transition:all 0.2s; }
+        .history-item:hover { border-color:var(--accent); }
+        .history-item .hi-title { font-size:0.8rem; font-weight:600; }
+        .history-item .hi-date { font-size:0.68rem; color:var(--text-dim); }
+        .history-empty { color:var(--text-dim); font-size:0.82rem; text-align:center; padding:2rem; }
+
+        /* Custom Framework */
+        .custom-fw { margin-top:1rem; }
+        .custom-fw input { width:100%; padding:0.6rem 0.75rem; background:var(--surface-2); border:1px solid var(--border); border-radius:8px; color:var(--text); font-size:0.82rem; font-family:inherit; margin-bottom:0.5rem; }
+        .custom-fw input:focus { outline:none; border-color:var(--accent); }
+
+        footer { text-align:center; margin-top:3rem; padding-top:1.5rem; border-top:1px solid var(--border); }
+        footer p { color:var(--text-dim); font-size:0.78rem; }
+        footer a { color:var(--accent); text-decoration:none; }
+
+        @media (max-width:600px) { .container { padding:1rem; } .analysis-grid,.context-row { grid-template-columns:1fr 1fr; } .compare-row { grid-template-columns:1fr; } .tabs { overflow-x:auto; } }
+        @media print { body { background:white; color:#111; } .input-section,.toolbar,footer,.card-actions,.tabs { display:none; } .result-card { break-inside:avoid; border-color:#ddd; } .result-card .card-body { color:#222; } }
+    </style>
+</head>
+<body>
+<div class="container">
+    <header>
+        <h1>BA <span>Analysis Toolkit</span></h1>
+        <p>AI-powered Business Analysis — 7 frameworks + executive synthesis</p>
+        <div class="badge">Built by Sanjay Prakash Ravi · Live Web Research</div>
+    </header>
+
+    <div class="tabs">
+        <div class="tab active" onclick="switchTab('analyse')">📊 Analyse</div>
+        <div class="tab" onclick="switchTab('compare')">⚖️ Compare</div>
+        <div class="tab" onclick="switchTab('history')">🕐 History</div>
+    </div>
+
+    <!-- ANALYSE TAB -->
+    <div class="tab-content active" id="tab-analyse">
+        <div class="input-section">
+            <label>Context</label>
+            <div class="context-row">
+                <select id="industry"><option value="">Industry...</option><option>FinTech</option><option>HealthTech</option><option>EdTech</option><option>E-Commerce</option><option selected>SaaS / B2B</option><option>CleanTech / Energy</option><option>PropTech / Real Estate</option><option>FoodTech</option><option>Logistics / Supply Chain</option><option>Media / Entertainment</option><option>Automotive / Mobility</option><option>Cybersecurity</option><option>AgriTech</option><option>InsurTech</option><option>Other</option></select>
+                <select id="region"><option value="">Region...</option><option>Ireland</option><option>UK</option><option selected>EU</option><option>North America</option><option>Middle East</option><option>India</option><option>Southeast Asia</option><option>Africa</option><option>LATAM</option><option>Global</option></select>
+                <select id="stage"><option value="">Company Stage...</option><option>Pre-seed / Idea</option><option selected>Startup (Seed-A)</option><option>Scale-up (B-C)</option><option>Enterprise / Mature</option><option>Pivot / Turnaround</option></select>
+            </div>
+            <label>Describe the business problem or idea</label>
+            <textarea id="problem-input">A startup (Norma) is building an AI-powered "agentic operating system" for Italian accounting firms (commercialisti). There are ~120,000 registered accountants across ~70,000 firms in Italy. These firms spend 40-60% of billable hours on repetitive, high-skill but mechanical document work: reclassifying financial statements per Italian Civil Code, drafting 3-year business plans, reviewing contracts for risky clauses, executing quarterly statutory auditor checklists, searching for EU/national grants, and monitoring daily tax regulation changes. Existing solutions fail — incumbent ERPs (TeamSystem, Zucchetti) have slow bolted-on AI chatbots, while generic AI tools (ChatGPT, Claude) lack Italian tax law understanding, audit trails, and GDPR compliance. Norma's solution: 5 specialist AI agents orchestrated by a senior AI, with partner-review workflows, compliance-native design (Legge 132/2025, EU AI Act), and deep Italian fiscal infrastructure integrations. Direct competitor Dyogene.ai launched 8 weeks ago with ~100 users and no funding. Normo.ai was acquired by TeamSystem in Oct 2025. The window is 18-24 months before incumbents consolidate the category.</textarea>
+
+            <div class="analysis-grid">
+                <button class="analysis-btn" onclick="runAnalysis('market_sizing')"><div class="icon">📊</div><div class="label">Market Sizing</div><div class="desc">TAM / SAM / SOM</div></button>
+                <button class="analysis-btn" onclick="runAnalysis('competitor')"><div class="icon">🎯</div><div class="label">Competitor</div><div class="desc">Landscape & gaps</div></button>
+                <button class="analysis-btn" onclick="runAnalysis('swot')"><div class="icon">⚖️</div><div class="label">SWOT</div><div class="desc">Internal & external</div></button>
+                <button class="analysis-btn" onclick="runAnalysis('porters')"><div class="icon">🏛️</div><div class="label">Porter's Five</div><div class="desc">Industry forces</div></button>
+                <button class="analysis-btn" onclick="runAnalysis('pestle')"><div class="icon">🌍</div><div class="label">PESTLE</div><div class="desc">Macro environment</div></button>
+                <button class="analysis-btn" onclick="runAnalysis('stakeholder')"><div class="icon">👥</div><div class="label">Stakeholder</div><div class="desc">Power / Interest</div></button>
+                <button class="analysis-btn" onclick="runAnalysis('requirements')"><div class="icon">📋</div><div class="label">Requirements</div><div class="desc">Functional & NFR</div></button>
+                <button class="analysis-btn run-all" onclick="runAll()">🚀 Run Full Analysis + Executive Summary</button>
+            </div>
+
+            <div class="custom-fw">
+                <input type="text" id="custom-framework" placeholder="Custom framework: e.g. 'BCG Growth Matrix' or 'Value Chain Analysis'...">
+                <button class="analysis-btn" style="width:100%;text-align:center" onclick="runCustom()"><div class="label">▶ Run Custom Framework</div></button>
+            </div>
+
+            <div class="toolbar">
+                <button onclick="exportPDF()">📄 Export PDF Report</button>
+                <button onclick="copyAll()">📋 Copy All</button>
+                <button onclick="shareEmail()">✉️ Email Report</button>
+                <button onclick="saveSession()">💾 Save Session</button>
+                <button onclick="clearResults()">🗑️ Clear</button>
+            </div>
+        </div>
+        <div class="results" id="results"></div>
+    </div>
+
+    <!-- COMPARE TAB -->
+    <div class="tab-content" id="tab-compare">
+        <div class="input-section">
+            <label>Compare Two Business Ideas / Companies</label>
+            <div class="compare-row">
+                <textarea id="compare-a" placeholder="Business A: Describe the first idea or company..."></textarea>
+                <textarea id="compare-b" placeholder="Business B: Describe the second idea or company..."></textarea>
+            </div>
+            <select id="compare-framework" style="width:100%;padding:0.6rem;background:var(--surface-2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:0.82rem;margin-bottom:0.75rem;">
+                <option value="market_sizing">Market Sizing Comparison</option>
+                <option value="competitor">Competitive Position Comparison</option>
+                <option value="swot">SWOT Comparison</option>
+                <option value="porters">Porter's Five Forces Comparison</option>
+                <option value="overall">Full Strategic Comparison</option>
+            </select>
+            <button class="analysis-btn run-all" onclick="runComparison()">⚖️ Run Comparison</button>
+        </div>
+        <div class="results" id="compare-results"></div>
+    </div>
+
+    <!-- HISTORY TAB -->
+    <div class="tab-content" id="tab-history">
+        <div class="history-panel" id="history-panel">
+            <div class="history-empty">No saved sessions yet. Run an analysis and click "Save Session".</div>
+        </div>
+    </div>
+
+    <footer>
+        <p><a href="https://sanjayprakash-git.github.io/portfolio" target="_blank">Portfolio</a> · <a href="https://www.linkedin.com/in/sanjay-prakash-a92291186/" target="_blank">LinkedIn</a> · Powered by live web research & structured BA methodology</p>
+    </footer>
+</div>
+
+<script>
+const API_URL = 'https://portfolio-proxy-two.vercel.app/api/ba';
+let analysisResults = {};
+
+// Tabs
+function switchTab(id) {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+    document.querySelector(`#tab-${id}`).classList.add('active');
+    document.querySelectorAll('.tab')[['analyse','compare','history'].indexOf(id)].classList.add('active');
+    if (id === 'history') loadHistory();
+}
+
+function getContext() {
+    const i = document.getElementById('industry').value;
+    const r = document.getElementById('region').value;
+    const s = document.getElementById('stage').value;
+    let ctx = '';
+    if (i) ctx += `Industry: ${i}. `;
+    if (r) ctx += `Region: ${r}. `;
+    if (s) ctx += `Stage: ${s}. `;
+    return ctx;
+}
+
+const PROMPTS = {
+    market_sizing: `You are a McKinsey engagement manager. Output ONLY structured analysis. No introductions. Use ## headers and markdown tables for ALL data. Every number shows calculation. End sections with bold "So what?" line.\n\n## 1. TAM\n| Parameter | Value | Source |\n\n## 2. SAM\n| Filter | Reduction | Remaining |\n\n## 3. SOM Year 1-3\n| Year | Firms | ARPU | Revenue | Penetration % |\n\n## 4. Bottom-Up Check\n| Metric | Value | Logic |\n\n## 5. Assumptions\n| # | Assumption | Confidence | If Wrong |\n\n## 6. Sources\n| Claim | Source |`,
+    competitor: `You are a Bain analyst. Output ONLY structured analysis. No introductions. Tables for ALL comparisons. Max 10 words/cell.\n\n## 1. Direct Competitors\n| Company | Founded | Funding | Users | Strength | Weakness |\n\n## 2. Indirect\n| Alternative | What Users Do | Switching Friction |\n\n## 3. Matrix\n| Dimension | CompA | CompB | CompC | [This] |\n(Use ● Strong ◐ Moderate ○ Weak)\n\n## 4. White Space\n| Gap | Evidence | Size |\n\n## 5. Barriers\n| Barrier | Height | Our Position |\n\n## 6. Positioning\nStatement: For [target] who [need]...`,
+    swot: `You are a BCG consultant. Output ONLY SWOT. No introductions. Tables. Max 12 words/point. Specific not generic.\n\n## SWOT Matrix\n| | Helpful | Harmful |\n| Internal | S1-S5 | W1-W5 |\n| External | O1-O5 | T1-T5 |\n\n## TOWS\n| Type | Combination | Action |\n\n## Priority Actions (90 Days)\n| # | Action | Owner | Metric |`,
+    porters: `You are an industry analyst. Output ONLY Five Forces. No introductions. Rate 🔴High/🟡Medium/🟢Low.\n\n## Summary\n| Force | Rating | Key Driver |\n\n## 1-5. Each force with evidence table\n| Factor | Assessment | Evidence |\n\n## Verdict\nAttractiveness: X/10\nEntry implication: (one sentence)`,
+    pestle: `You are a macro-environment analyst. Output ONLY PESTLE. No introductions. Named specific factors. Real laws/data.\n\n## Summary\n| Category | Top Factor | Impact | Timeframe | Direction |\n\n## Each category: table with Factor | Impact | Timeframe | Detail\n\n## Critical Factors Ranked\n| Rank | Factor | Impact×Likelihood | Action |\n\n## Scenarios\n| Scenario | Trigger | Impact | Response |`,
+    stakeholder: `You are a change consultant. Output ONLY stakeholder analysis. No introductions. Tables + emojis.\n\n## Register\n| # | Stakeholder | Role | Interest | Attitude |\n\n## Power/Interest Grid\n| Quadrant | Stakeholders | Strategy |\n🔴 High/High → Manage Closely\n🟠 High/Low → Keep Satisfied\n🟡 Low/High → Keep Informed\n🟢 Low/Low → Monitor\n\n## Communication Plan\n| Quadrant | Frequency | Channel | Message |\n\n## Risks\n| Risk | Probability | Impact | Mitigation |`,
+    requirements: `You are a senior BA. Output ONLY spec. No introductions. Numbered requirements. Given/When/Then.\n\n## Business Requirements\n| ID | Requirement | KPI | Target |\n\n## Functional (MoSCoW)\n| ID | Requirement | Priority | Rationale |\n\n## Non-Functional\n| ID | Category | Requirement | Target |\n\n## User Stories + Acceptance Criteria\nUS-01: As a... Given/When/Then\n\n## Constraints\n| Type | Detail | If Unavailable |`,
+    executive_summary: `You are a senior partner. Output ONLY summary. First line = verdict.\n\n## Strategic Verdict\n**[GO/CONDITIONAL GO/NO-GO] — Confidence: X%**\n\n## Market Opportunity (3 sentences max)\n## Competitive Position (3 sentences max)\n\n## Top Risks\n| # | Risk | Severity | Mitigation |\n\n## Top Opportunities\n| # | Opportunity | Path | Timeline |\n\n## 90-Day Plan\n| Week | Action | Owner | Deliverable |\n\n## Assumptions to Validate\n| # | Assumption | Method | Kill Criterion |`
+};
+
+const LABELS = {
+    market_sizing:{icon:'📊',title:'Market Sizing (TAM/SAM/SOM)'},
+    competitor:{icon:'🎯',title:'Competitor Analysis'},
+    swot:{icon:'⚖️',title:'SWOT Analysis'},
+    porters:{icon:'🏛️',title:"Porter's Five Forces"},
+    pestle:{icon:'🌍',title:'PESTLE Analysis'},
+    stakeholder:{icon:'👥',title:'Stakeholder Map'},
+    requirements:{icon:'📋',title:'Requirements Specification'},
+    executive_summary:{icon:'⭐',title:'Executive Summary'}
+};
+
+function delay(ms){return new Promise(r=>setTimeout(r,ms));}
+
+async function runAnalysis(type) {
+    const input = document.getElementById('problem-input').value.trim();
+    if (!input) { alert('Please describe a business problem first.'); return; }
+    const ctx = getContext();
+    const results = document.getElementById('results');
+    const cardId = `result-${type}`;
+    const existing = document.getElementById(cardId);
+    if (existing) existing.remove();
+
+    const card = document.createElement('div');
+    card.className = type==='executive_summary'?'result-card summary-card':'result-card';
+    card.id = cardId;
+    card.innerHTML = `<div class="card-header"><div class="card-header-left">${LABELS[type].icon} ${LABELS[type].title}</div></div><div class="loading"><div class="spinner"></div>Researching & analyzing...</div>`;
+    if (type==='executive_summary') results.prepend(card); else results.appendChild(card);
+
+    const userMessage = ctx ? `Context: ${ctx}\n\nBusiness Problem:\n${input}` : input;
+    let messages;
+    if (type==='executive_summary') {
+        const allOutputs = Object.entries(analysisResults).map(([k,v])=>`## ${LABELS[k]?.title||k}\n${v}`).join('\n\n---\n\n');
+        messages = [{role:'system',content:PROMPTS[type]},{role:'user',content:`${userMessage}\n\n---\nANALYSIS OUTPUTS:\n${allOutputs}`}];
+    } else {
+        messages = [{role:'system',content:PROMPTS[type]},{role:'user',content:userMessage}];
+    }
+
+    try {
+        const res = await fetch(API_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({analysis_type:type,messages})});
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error?.message||'API error');
+        const content = data.choices[0].message.content;
+        const citations = data.citations||[];
+        analysisResults[type] = content;
+
+        let citHtml = '';
+        if (citations.length) citHtml = `<div style="margin-top:1rem;padding-top:0.7rem;border-top:1px solid var(--border);font-size:0.7rem;color:var(--text-dim)"><strong style="color:var(--accent)">Sources:</strong><ol style="margin:0.3rem 0 0 1rem">${citations.map(c=>`<li><a href="${c}" target="_blank" style="color:var(--text-dim)">${c.replace(/^https?:\/\/(www\.)?/,'').slice(0,55)}...</a></li>`).join('')}</ol></div>`;
+
+        let visualHtml = '';
+        if (type==='market_sizing') visualHtml = renderTAMVisual(content);
+        if (type==='swot') visualHtml = renderSWOTGrid(content);
+
+        card.innerHTML = `<div class="card-header"><div class="card-header-left">${LABELS[type].icon} ${LABELS[type].title}</div><div class="card-actions"><button onclick="goDeeper('${type}')">🔍 Deeper</button><button onclick="copyCard('${type}')">📋</button></div></div><div class="card-body">${visualHtml}${formatMarkdown(content)}${citHtml}</div>`;
+    } catch(e) {
+        card.innerHTML = `<div class="card-header"><div class="card-header-left">${LABELS[type].icon} ${LABELS[type].title}</div></div><div class="card-body" style="color:var(--red)">Error: ${e.message}</div>`;
+    }
+}
+
+async function runAll() {
+    const input = document.getElementById('problem-input').value.trim();
+    if (!input) { alert('Please describe a business problem first.'); return; }
+    document.getElementById('results').innerHTML = '';
+    analysisResults = {};
+    const types = ['market_sizing','competitor','swot','porters','pestle','stakeholder','requirements'];
+    for (const type of types) { await runAnalysis(type); await delay(2000); }
+    await runAnalysis('executive_summary');
+}
+
+async function runCustom() {
+    const fw = document.getElementById('custom-framework').value.trim();
+    if (!fw) { alert('Enter a framework name.'); return; }
+    const input = document.getElementById('problem-input').value.trim();
+    if (!input) { alert('Describe a business problem first.'); return; }
+    const ctx = getContext();
+    const results = document.getElementById('results');
+    const card = document.createElement('div');
+    card.className = 'result-card';
+    card.innerHTML = `<div class="card-header"><div class="card-header-left">🔧 ${fw}</div></div><div class="loading"><div class="spinner"></div>Researching...</div>`;
+    results.appendChild(card);
+
+    try {
+        const res = await fetch(API_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({analysis_type:'custom',messages:[{role:'system',content:`You are a senior strategy consultant. Apply the "${fw}" framework. Output structured analysis with tables. No introductions.`},{role:'user',content:`Context: ${ctx}\n\n${input}`}]})});
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error?.message||'API error');
+        const content = data.choices[0].message.content;
+        const citations = data.citations||[];
+        let citHtml = citations.length?`<div style="margin-top:1rem;padding-top:0.7rem;border-top:1px solid var(--border);font-size:0.7rem;color:var(--text-dim)"><strong style="color:var(--accent)">Sources:</strong><ol style="margin:0.3rem 0 0 1rem">${citations.map(c=>`<li><a href="${c}" target="_blank" style="color:var(--text-dim)">${c.replace(/^https?:\/\/(www\.)?/,'').slice(0,55)}</a></li>`).join('')}</ol></div>`:'';
+        card.innerHTML = `<div class="card-header"><div class="card-header-left">🔧 ${fw}</div><div class="card-actions"><button onclick="navigator.clipboard.writeText(\`${content.replace(/`/g,'')}\`);showToast('Copied')">📋</button></div></div><div class="card-body">${formatMarkdown(content)}${citHtml}</div>`;
+    } catch(e) { card.innerHTML = `<div class="card-header"><div class="card-header-left">🔧 ${fw}</div></div><div class="card-body" style="color:var(--red)">Error: ${e.message}</div>`; }
+}
+
+// Comparison Mode
+async function runComparison() {
+    const a = document.getElementById('compare-a').value.trim();
+    const b = document.getElementById('compare-b').value.trim();
+    if (!a||!b) { alert('Describe both businesses.'); return; }
+    const fw = document.getElementById('compare-framework').value;
+    const results = document.getElementById('compare-results');
+    results.innerHTML = '';
+    const card = document.createElement('div');
+    card.className = 'result-card summary-card';
+    card.innerHTML = `<div class="card-header"><div class="card-header-left">⚖️ Comparison Analysis</div></div><div class="loading"><div class="spinner"></div>Comparing...</div>`;
+    results.appendChild(card);
+
+    const prompt = fw==='overall'
+        ? `Compare these two businesses across Market Size, Competitive Position, SWOT, and Strategic Viability. Use tables. Declare a winner with rationale.`
+        : `Apply ${LABELS[fw]?.title||fw} to BOTH businesses side-by-side. Use comparison tables. Highlight which is stronger and why.`;
+
+    try {
+        const res = await fetch(API_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({analysis_type:'comparison',messages:[{role:'system',content:`You are a senior strategy consultant. ${prompt} No introductions. Start directly with tables.`},{role:'user',content:`BUSINESS A:\n${a}\n\n---\n\nBUSINESS B:\n${b}`}]})});
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error?.message||'API error');
+        const content = data.choices[0].message.content;
+        const citations = data.citations||[];
+        let citHtml = citations.length?`<div style="margin-top:1rem;padding-top:0.7rem;border-top:1px solid var(--border);font-size:0.7rem;color:var(--text-dim)"><strong style="color:var(--accent)">Sources:</strong><ol style="margin:0.3rem 0 0 1rem">${citations.map(c=>`<li><a href="${c}" target="_blank" style="color:var(--text-dim)">${c.replace(/^https?:\/\/(www\.)?/,'').slice(0,55)}</a></li>`).join('')}</ol></div>`:'';
+        card.innerHTML = `<div class="card-header"><div class="card-header-left">⚖️ Comparison: ${LABELS[fw]?.title||'Full Strategic'}</div><div class="card-actions"><button onclick="navigator.clipboard.writeText(document.querySelector('#compare-results .card-body').innerText);showToast('Copied')">📋</button></div></div><div class="card-body">${formatMarkdown(content)}${citHtml}</div>`;
+    } catch(e) { card.innerHTML = `<div class="card-header"><div class="card-header-left">⚖️ Comparison</div></div><div class="card-body" style="color:var(--red)">Error: ${e.message}</div>`; }
+}
+
+// Visual Renderers
+function renderTAMVisual(content) {
+    return `<div class="tam-visual"><div class="tam-circles"><div class="tam-circle tam">TAM</div><div class="tam-circle sam">SAM</div><div class="tam-circle som">SOM</div></div></div>`;
+}
+function renderSWOTGrid(content) {
+    return `<div class="swot-grid"><div class="swot-quad s"><h4>💪 Strengths</h4></div><div class="swot-quad w"><h4>⚠️ Weaknesses</h4></div><div class="swot-quad o"><h4>🚀 Opportunities</h4></div><div class="swot-quad t"><h4>🔥 Threats</h4></div></div>`;
+}
+
+// Go Deeper
+async function goDeeper(type) {
+    const input = document.getElementById('problem-input').value.trim();
+    const original = analysisResults[type];
+    if (!original) return;
+    const ctx = getContext();
+    const cardId = `result-${type}-deep`;
+    const existing = document.getElementById(cardId);
+    if (existing) existing.remove();
+    const results = document.getElementById('results');
+    const card = document.createElement('div');
+    card.className = 'result-card';
+    card.id = cardId;
+    card.innerHTML = `<div class="card-header"><div class="card-header-left">🔍 ${LABELS[type].title} — Deep Dive</div></div><div class="loading"><div class="spinner"></div>Researching deeper...</div>`;
+    document.getElementById(`result-${type}`).after(card);
+
+    try {
+        const res = await fetch(API_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({analysis_type:type+'_deep',messages:[{role:'system',content:`Review this analysis. Challenge assumptions. Cite specific data sources. Narrow estimates. Rate confidence 1-10.\n\nPrevious:\n${original}`},{role:'user',content:`Context: ${ctx}\n${input}`}]})});
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error?.message||'API error');
+        const content = data.choices[0].message.content;
+        const citations = data.citations||[];
+        analysisResults[type+'_deep'] = content;
+        let citHtml = citations.length?`<div style="margin-top:1rem;padding-top:0.7rem;border-top:1px solid var(--border);font-size:0.7rem;color:var(--text-dim)"><strong style="color:var(--accent)">Sources:</strong><ol style="margin:0.3rem 0 0 1rem">${citations.map(c=>`<li><a href="${c}" target="_blank" style="color:var(--text-dim)">${c.replace(/^https?:\/\/(www\.)?/,'').slice(0,55)}</a></li>`).join('')}</ol></div>`:'';
+        card.innerHTML = `<div class="card-header"><div class="card-header-left">🔍 Deep Dive</div><div class="card-actions"><button onclick="copyCard('${type}_deep')">📋</button></div></div><div class="card-body">${formatMarkdown(content)}${citHtml}</div>`;
+    } catch(e) { card.innerHTML = `<div class="card-header"><div class="card-header-left">🔍 Deep Dive</div></div><div class="card-body" style="color:var(--red)">Error: ${e.message}</div>`; }
+}
+
+// History / Sessions
+function saveSession() {
+    const input = document.getElementById('problem-input').value.trim();
+    if (!Object.keys(analysisResults).length) { alert('Run an analysis first.'); return; }
+    const sessions = JSON.parse(localStorage.getItem('ba_sessions')||'[]');
+    sessions.unshift({ id:Date.now(), title:input.slice(0,60)+'...', date:new Date().toLocaleDateString(), input, context:{industry:document.getElementById('industry').value,region:document.getElementById('region').value,stage:document.getElementById('stage').value}, results:analysisResults });
+    if (sessions.length>20) sessions.pop();
+    localStorage.setItem('ba_sessions',JSON.stringify(sessions));
+    showToast('Session saved');
+}
+function loadHistory() {
+    const sessions = JSON.parse(localStorage.getItem('ba_sessions')||'[]');
+    const panel = document.getElementById('history-panel');
+    if (!sessions.length) { panel.innerHTML = '<div class="history-empty">No saved sessions yet.</div>'; return; }
+    panel.innerHTML = sessions.map(s=>`<div class="history-item" onclick="loadSession(${s.id})"><div class="hi-title">${s.title}</div><div class="hi-date">${s.date}</div></div>`).join('') + `<button style="margin-top:0.75rem;width:100%" class="analysis-btn" onclick="clearHistory()"><div class="label">🗑️ Clear History</div></button>`;
+}
+function loadSession(id) {
+    const sessions = JSON.parse(localStorage.getItem('ba_sessions')||'[]');
+    const s = sessions.find(x=>x.id===id);
+    if (!s) return;
+    document.getElementById('problem-input').value = s.input;
+    if (s.context) { document.getElementById('industry').value=s.context.industry||''; document.getElementById('region').value=s.context.region||''; document.getElementById('stage').value=s.context.stage||''; }
+    analysisResults = s.results||{};
+    const results = document.getElementById('results');
+    results.innerHTML = '';
+    Object.entries(analysisResults).forEach(([type,content])=>{
+        if (!LABELS[type]) return;
+        const card = document.createElement('div');
+        card.className = type==='executive_summary'?'result-card summary-card':'result-card';
+        card.id = `result-${type}`;
+        card.innerHTML = `<div class="card-header"><div class="card-header-left">${LABELS[type].icon} ${LABELS[type].title}</div><div class="card-actions"><button onclick="goDeeper('${type}')">🔍</button><button onclick="copyCard('${type}')">📋</button></div></div><div class="card-body">${formatMarkdown(content)}</div>`;
+        results.appendChild(card);
+    });
+    switchTab('analyse');
+    showToast('Session loaded');
+}
+function clearHistory() { localStorage.removeItem('ba_sessions'); loadHistory(); showToast('History cleared'); }
+
+// Export & Share
+function exportPDF() {
+    const el = document.getElementById('results');
+    if (!el.innerHTML.trim()) { alert('Run an analysis first.'); return; }
+    const cover = document.createElement('div');
+    cover.innerHTML = `<div style="text-align:center;padding:60px 20px;font-family:sans-serif"><h1 style="font-size:28px;margin-bottom:10px">Business Analysis Report</h1><p style="color:#666;font-size:14px">${document.getElementById('problem-input').value.slice(0,100)}...</p><br><p style="font-size:12px;color:#999">Generated by BA Analysis Toolkit — Sanjay Prakash Ravi</p><p style="font-size:11px;color:#bbb">${new Date().toLocaleDateString()}</p></div><hr style="margin:20px 0">`;
+    const wrapper = document.createElement('div');
+    wrapper.appendChild(cover);
+    wrapper.innerHTML += el.innerHTML;
+    wrapper.style.background = 'white';
+    wrapper.style.color = '#111';
+    wrapper.querySelectorAll('.card-actions').forEach(e=>e.remove());
+    html2pdf().set({margin:10,filename:'BA-Analysis-Report.pdf',html2canvas:{scale:2},jsPDF:{format:'a4'}}).from(wrapper).save();
+    showToast('PDF downloading...');
+}
+function copyAll() {
+    const all = Object.entries(analysisResults).map(([k,v])=>`# ${LABELS[k]?.title||k}\n\n${v}`).join('\n\n---\n\n');
+    if (all) { navigator.clipboard.writeText(all); showToast('Copied as markdown'); }
+}
+function copyCard(type) { const c = analysisResults[type]; if (c) { navigator.clipboard.writeText(c); showToast('Copied'); } }
+function shareEmail() {
+    const all = Object.entries(analysisResults).map(([k,v])=>`${LABELS[k]?.title||k}\n\n${v}`).join('\n\n---\n\n');
+    if (!all) { alert('Run an analysis first.'); return; }
+    const subject = encodeURIComponent('BA Analysis Report — ' + document.getElementById('problem-input').value.slice(0,50));
+    const body = encodeURIComponent(all.slice(0,1800)+'...\n\n[Full report available in the BA Analysis Toolkit]');
+    window.open(`mailto:?subject=${subject}&body=${body}`);
+}
+function clearResults() { document.getElementById('results').innerHTML=''; analysisResults={}; }
+function showToast(msg) { const t=document.createElement('div'); t.textContent=msg; t.style.cssText='position:fixed;bottom:2rem;left:50%;transform:translateX(-50%);background:var(--green);color:white;padding:0.5rem 1.2rem;border-radius:8px;font-size:0.8rem;z-index:999;'; document.body.appendChild(t); setTimeout(()=>t.remove(),2000); }
+
+// Markdown
+function formatMarkdown(text) {
+    const lines = text.split('\n');
+    let html='',inTable=false;
+    for (let i=0;i<lines.length;i++) {
+        const line=lines[i];
+        const isRow=line.trim().startsWith('|')&&line.trim().endsWith('|');
+        const isSep=/^\|[\s\-:|]+\|$/.test(line.trim());
+        if (isRow&&!isSep) {
+            if (!inTable){html+='<table>';inTable=true;}
+            const cells=line.split('|').slice(1,-1);
+            const isH=i+1<lines.length&&/^\|[\s\-:|]+\|$/.test(lines[i+1]?.trim());
+            const tag=isH?'th':'td';
+            html+='<tr>'+cells.map(c=>`<${tag}>${esc(c.trim())}</${tag}>`).join('')+'</tr>';
+        } else if(isSep){} else {
+            if(inTable){html+='</table>';inTable=false;}
+            let l=esc(line);
+            l=l.replace(/^## (.+)$/,'<h3>$1</h3>');
+            l=l.replace(/^### (.+)$/,'<h3 style="font-size:0.83rem">$1</h3>');
+            l=l.replace(/^# (.+)$/,'<h3>$1</h3>');
+            l=l.replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>');
+            if(/^[-*] /.test(l)) l='<li>'+l.replace(/^[-*] /,'')+'</li>';
+            else if(/^\d+\. /.test(l)) l='<li>'+l.replace(/^\d+\. /,'')+'</li>';
+            else if(l.trim()==='') l='<br>';
+            html+=l+'\n';
+        }
+    }
+    if(inTable)html+='</table>';
+    return html;
+}
+function esc(t){return t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+</script>
+</body>
+</html>
