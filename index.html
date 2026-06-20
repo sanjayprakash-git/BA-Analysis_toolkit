@@ -493,11 +493,63 @@ function copyAll() {
 }
 function copyCard(type) { const c = analysisResults[type]; if (c) { navigator.clipboard.writeText(c); showToast('Copied'); } }
 function shareEmail() {
-    const all = Object.entries(analysisResults).map(([k,v])=>`${LABELS[k]?.title||k}\n\n${v}`).join('\n\n---\n\n');
-    if (!all) { alert('Run an analysis first.'); return; }
-    const subject = encodeURIComponent('BA Analysis Report — ' + document.getElementById('problem-input').value.slice(0,50));
-    const body = encodeURIComponent(all.slice(0,1800)+'...\n\n[Full report available in the BA Analysis Toolkit]');
-    window.open(`mailto:?subject=${subject}&body=${body}`);
+    if (!Object.keys(analysisResults).length) { alert('Run an analysis first.'); return; }
+    document.getElementById('email-modal').style.display = 'flex';
+    document.getElementById('email-to').focus();
+}
+function closeEmailModal() {
+    document.getElementById('email-modal').style.display = 'none';
+    document.getElementById('email-to').value = '';
+    document.getElementById('email-status').textContent = '';
+}
+async function sendReportEmail() {
+    const to = document.getElementById('email-to').value.trim();
+    if (!to) { document.getElementById('email-status').textContent = 'Please enter an email address.'; return; }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)) { document.getElementById('email-status').textContent = 'Invalid email address.'; return; }
+
+    const btn = document.getElementById('email-send-btn');
+    const status = document.getElementById('email-status');
+    btn.disabled = true;
+    btn.textContent = 'Sending…';
+    status.textContent = '';
+
+    // Build HTML content from results
+    const htmlContent = Object.entries(analysisResults).map(([k, v]) => {
+        const label = LABELS[k] || { icon: '', title: k };
+        return `<div style="margin-bottom:24px">
+            <h3 style="color:#58a6ff;font-size:15px;margin:0 0 10px;padding-bottom:6px;border-bottom:1px solid #30363d">${label.icon} ${label.title}</h3>
+            <div style="color:#c9d1d9;font-size:13px;line-height:1.7;white-space:pre-wrap">${v}</div>
+        </div>`;
+    }).join('');
+
+    const problemStatement = document.getElementById('problem-input')?.value?.slice(0, 200) || '';
+
+    try {
+        const res = await fetch('https://portfolio-proxy-two.vercel.app/api/send-report', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                to,
+                subject: `Your BA Analysis Report — ${problemStatement.slice(0, 50) || new Date().toLocaleDateString()}`,
+                htmlContent,
+                problemStatement
+            })
+        });
+        const data = await res.json();
+        if (res.ok && data.ok) {
+            status.style.color = 'var(--green)';
+            status.textContent = '✓ Report sent! Check your inbox.';
+            btn.textContent = '✓ Sent';
+            setTimeout(() => closeEmailModal(), 2500);
+        } else {
+            throw new Error(data.error || 'Send failed');
+        }
+    } catch (e) {
+        status.style.color = 'var(--red)';
+        status.textContent = `Failed: ${e.message}`;
+        btn.disabled = false;
+        btn.textContent = 'Send Report';
+    }
 }
 function clearResults() { document.getElementById('results').innerHTML=''; analysisResults={}; }
 function showToast(msg) { const t=document.createElement('div'); t.textContent=msg; t.style.cssText='position:fixed;bottom:2rem;left:50%;transform:translateX(-50%);background:var(--green);color:white;padding:0.5rem 1.2rem;border-radius:8px;font-size:0.8rem;z-index:999;'; document.body.appendChild(t); setTimeout(()=>t.remove(),2000); }
@@ -534,5 +586,21 @@ function formatMarkdown(text) {
 }
 function esc(t){return t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
 </script>
+<!-- Email Report Modal -->
+<div id="email-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:1000;align-items:center;justify-content:center;padding:16px">
+  <div style="background:#161b22;border:1px solid #30363d;border-radius:12px;padding:28px;width:100%;max-width:420px;position:relative">
+    <button onclick="closeEmailModal()" style="position:absolute;top:12px;right:14px;background:none;border:none;color:#8b949e;font-size:18px;cursor:pointer;line-height:1">✕</button>
+    <h3 style="margin:0 0 6px;color:#e6edf3;font-size:16px">📧 Send Report to Email</h3>
+    <p style="margin:0 0 18px;color:#8b949e;font-size:13px">Enter the recipient's email — the full report will be sent from Sanjay's account.</p>
+    <input id="email-to" type="email" placeholder="recipient@example.com"
+      style="width:100%;box-sizing:border-box;padding:10px 12px;background:#0d1117;border:1px solid #30363d;border-radius:8px;color:#e6edf3;font-size:14px;outline:none;margin-bottom:12px"
+      onkeydown="if(event.key==='Enter') sendReportEmail()" />
+    <div id="email-status" style="font-size:13px;min-height:18px;margin-bottom:12px"></div>
+    <div style="display:flex;gap:10px;justify-content:flex-end">
+      <button onclick="closeEmailModal()" style="padding:8px 16px;background:none;border:1px solid #30363d;border-radius:8px;color:#8b949e;cursor:pointer;font-size:13px">Cancel</button>
+      <button id="email-send-btn" onclick="sendReportEmail()" style="padding:8px 20px;background:#238636;border:none;border-radius:8px;color:white;cursor:pointer;font-size:13px;font-weight:600">Send Report</button>
+    </div>
+  </div>
+</div>
 </body>
 </html>
