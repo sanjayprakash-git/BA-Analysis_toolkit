@@ -308,12 +308,13 @@ async function runAll() {
     const updateBtn = () => { if (btn) btn.textContent = `⏳ Running… ${completed}/${types.length} done`; };
     if (btn) { btn.disabled = true; updateBtn(); }
 
-    // Run all 7 with a stagger to avoid Groq rate limits
-    await Promise.allSettled(types.map((type, i) =>
-        new Promise(resolve => setTimeout(resolve, i * 1500))
-            .then(() => runAnalysis(type))
-            .then(() => { completed++; updateBtn(); })
-    ));
+    // Run sequentially to avoid Groq rate limits (12K TPM)
+    for (const type of types) {
+        await runAnalysis(type);
+        completed++;
+        updateBtn();
+        await delay(2000);
+    }
 
     // Auto-retry any failed sections once
     const failedFirst = types.filter(t => {
@@ -322,12 +323,13 @@ async function runAll() {
     });
     if (failedFirst.length > 0) {
         if (btn) btn.textContent = `🔄 Retrying ${failedFirst.length} failed section(s)…`;
-        await new Promise(r => setTimeout(r, 3000)); // wait 3s before retry
-        await Promise.allSettled(failedFirst.map((type, i) =>
-            new Promise(resolve => setTimeout(resolve, i * 2000))
-                .then(() => runAnalysis(type))
-                .then(() => { completed++; updateBtn(); })
-        ));
+        await delay(5000);
+        for (const type of failedFirst) {
+            await runAnalysis(type);
+            completed++;
+            updateBtn();
+            await delay(3000);
+        }
     }
 
     // Check how many failed
