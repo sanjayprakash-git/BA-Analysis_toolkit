@@ -306,27 +306,10 @@ async function runAll() {
     const updateBtn = (msg) => { if (btn) btn.textContent = msg || `⏳ Running… ${completed}/${types.length} done`; };
     if (btn) { btn.disabled = true; updateBtn('⏳ Starting analysis…'); }
 
-    // Run in 3 batches to stay under Groq 12K TPM free tier limit
-    const batches = [
-        ['market_sizing', 'competitor', 'swot'],
-        ['porters', 'pestle'],
-        ['stakeholder', 'requirements']
-    ];
-
-    for (let b = 0; b < batches.length; b++) {
-        const batch = batches[b];
-        updateBtn(`⏳ Batch ${b+1}/3 running… ${completed}/${types.length} done`);
-        await Promise.allSettled(batch.map(type =>
-            runAnalysis(type).then(() => { completed++; updateBtn(); })
-        ));
-        if (b < batches.length - 1) {
-            // Wait 20s between batches to reset TPM window
-            for (let s = 20; s > 0; s--) {
-                updateBtn(`⏳ Cooling down ${s}s before next batch… (${completed}/${types.length} done)`);
-                await delay(1000);
-            }
-        }
-    }
+    // Run all 7 in parallel — llama-3.1-8b-instant has 131K TPM, no rate limit issues
+    await Promise.allSettled(types.map(type =>
+        runAnalysis(type).then(() => { completed++; updateBtn(); })
+    ));
 
     // Auto-retry failed sections once
     const failedFirst = types.filter(t => {
