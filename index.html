@@ -305,15 +305,15 @@ async function runAll() {
     let completed = 0;
 
     // Update button with live progress
-    const updateBtn = () => { if (btn) btn.textContent = `⏳ Running… ${completed}/${types.length} done`; };
-    if (btn) { btn.disabled = true; updateBtn(); }
+    const updateBtn = () => { if (btn) btn.textContent = `⏳ Running… ${completed}/${types.length} done (~${Math.max(0,(types.length-completed))*10}s remaining)`; };
+    if (btn) { btn.disabled = true; btn.textContent = '⏳ Starting analysis (~90s total)…'; }
 
     // Run sequentially to avoid Groq rate limits (12K TPM)
     for (const type of types) {
         await runAnalysis(type);
         completed++;
         updateBtn();
-        await delay(2000);
+        await delay(8000);
     }
 
     // Auto-retry any failed sections once
@@ -323,12 +323,12 @@ async function runAll() {
     });
     if (failedFirst.length > 0) {
         if (btn) btn.textContent = `🔄 Retrying ${failedFirst.length} failed section(s)…`;
-        await delay(5000);
+        await delay(10000);
         for (const type of failedFirst) {
             await runAnalysis(type);
             completed++;
             updateBtn();
-            await delay(3000);
+            await delay(8000);
         }
     }
 
