@@ -308,9 +308,11 @@ async function runAll() {
     const updateBtn = () => { if (btn) btn.textContent = `⏳ Running… ${completed}/${types.length} done`; };
     if (btn) { btn.disabled = true; updateBtn(); }
 
-    // Run all 7 in parallel
-    await Promise.allSettled(types.map(type =>
-        runAnalysis(type).then(() => { completed++; updateBtn(); })
+    // Run all 7 with a small stagger to avoid Groq rate limits
+    await Promise.allSettled(types.map((type, i) =>
+        new Promise(resolve => setTimeout(resolve, i * 500))
+            .then(() => runAnalysis(type))
+            .then(() => { completed++; updateBtn(); })
     ));
 
     // Check how many failed
