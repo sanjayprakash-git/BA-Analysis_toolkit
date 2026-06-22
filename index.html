@@ -303,36 +303,47 @@ async function runAll() {
     const types = ['market_sizing','competitor','swot','porters','pestle','stakeholder','requirements'];
     const btn = document.querySelector('.run-all');
     let completed = 0;
+    const updateBtn = (msg) => { if (btn) btn.textContent = msg || `⏳ Running… ${completed}/${types.length} done`; };
+    if (btn) { btn.disabled = true; updateBtn('⏳ Starting analysis…'); }
 
-    // Update button with live progress
-    const updateBtn = () => { if (btn) btn.textContent = `⏳ Running… ${completed}/${types.length} done (~${Math.max(0,(types.length-completed))*10}s remaining)`; };
-    if (btn) { btn.disabled = true; btn.textContent = '⏳ Starting analysis (~90s total)…'; }
+    // Run in 3 batches to stay under Groq 12K TPM free tier limit
+    const batches = [
+        ['market_sizing', 'competitor', 'swot'],
+        ['porters', 'pestle'],
+        ['stakeholder', 'requirements']
+    ];
 
-    // Run sequentially to avoid Groq rate limits (12K TPM)
-    for (const type of types) {
-        await runAnalysis(type);
-        completed++;
-        updateBtn();
-        await delay(8000);
+    for (let b = 0; b < batches.length; b++) {
+        const batch = batches[b];
+        updateBtn(`⏳ Batch ${b+1}/3 running… ${completed}/${types.length} done`);
+        await Promise.allSettled(batch.map(type =>
+            runAnalysis(type).then(() => { completed++; updateBtn(); })
+        ));
+        if (b < batches.length - 1) {
+            // Wait 20s between batches to reset TPM window
+            for (let s = 20; s > 0; s--) {
+                updateBtn(`⏳ Cooling down ${s}s before next batch… (${completed}/${types.length} done)`);
+                await delay(1000);
+            }
+        }
     }
 
-    // Auto-retry any failed sections once
+    // Auto-retry failed sections once
     const failedFirst = types.filter(t => {
         const el = document.getElementById(`result-${t}`);
         return el && (el.querySelector('[style*="var(--red)"]') || el.querySelector('.card-body')?.textContent?.startsWith('Error:'));
     });
     if (failedFirst.length > 0) {
-        if (btn) btn.textContent = `🔄 Retrying ${failedFirst.length} failed section(s)…`;
-        await delay(10000);
-        for (const type of failedFirst) {
-            await runAnalysis(type);
-            completed++;
-            updateBtn();
-            await delay(8000);
-        }
+        updateBtn(`🔄 Retrying ${failedFirst.length} failed section(s)…`);
+        await delay(15000);
+        await Promise.allSettled(failedFirst.map((type, i) =>
+            new Promise(r => setTimeout(r, i * 3000))
+                .then(() => runAnalysis(type))
+                .then(() => { completed++; updateBtn(); })
+        ));
     }
 
-    // Check how many failed
+    // Check final failures
     const failed = types.filter(t => {
         const el = document.getElementById(`result-${t}`);
         return el && el.querySelector('[style*="var(--red)"]');
@@ -347,7 +358,7 @@ async function runAll() {
         }
     }
 
-    if (btn) btn.textContent = `⭐ Generating Executive Summary…`;
+    updateBtn('⭐ Generating Executive Summary…');
     await runAnalysis('executive_summary');
     if (btn) { btn.disabled = false; btn.textContent = '🚀 Run Full Analysis + Executive Summary'; }
 }
