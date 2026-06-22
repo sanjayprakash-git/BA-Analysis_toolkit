@@ -308,12 +308,27 @@ async function runAll() {
     const updateBtn = () => { if (btn) btn.textContent = `⏳ Running… ${completed}/${types.length} done`; };
     if (btn) { btn.disabled = true; updateBtn(); }
 
-    // Run all 7 with a small stagger to avoid Groq rate limits
+    // Run all 7 with a stagger to avoid Groq rate limits
     await Promise.allSettled(types.map((type, i) =>
-        new Promise(resolve => setTimeout(resolve, i * 500))
+        new Promise(resolve => setTimeout(resolve, i * 1500))
             .then(() => runAnalysis(type))
             .then(() => { completed++; updateBtn(); })
     ));
+
+    // Auto-retry any failed sections once
+    const failedFirst = types.filter(t => {
+        const el = document.getElementById(`result-${t}`);
+        return el && (el.querySelector('[style*="var(--red)"]') || el.querySelector('.card-body')?.textContent?.startsWith('Error:'));
+    });
+    if (failedFirst.length > 0) {
+        if (btn) btn.textContent = `🔄 Retrying ${failedFirst.length} failed section(s)…`;
+        await new Promise(r => setTimeout(r, 3000)); // wait 3s before retry
+        await Promise.allSettled(failedFirst.map((type, i) =>
+            new Promise(resolve => setTimeout(resolve, i * 2000))
+                .then(() => runAnalysis(type))
+                .then(() => { completed++; updateBtn(); })
+        ));
+    }
 
     // Check how many failed
     const failed = types.filter(t => {
