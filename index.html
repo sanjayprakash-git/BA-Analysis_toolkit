@@ -575,18 +575,24 @@ async function sendReportEmail() {
     if (!to) { document.getElementById('email-status').textContent = 'Please enter an email address.'; return; }
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)) { document.getElementById('email-status').textContent = 'Invalid email address.'; return; }
 
+    if (Object.keys(analysisResults).length === 0) {
+        document.getElementById('email-status').style.color = 'var(--red)';
+        document.getElementById('email-status').textContent = 'No analysis to send — run an analysis first.';
+        return;
+    }
+
     const btn = document.getElementById('email-send-btn');
     const status = document.getElementById('email-status');
     btn.disabled = true;
     btn.textContent = 'Sending…';
     status.textContent = '';
 
-    // Build HTML content from results
+    // Build HTML content from results — render markdown properly
     const htmlContent = Object.entries(analysisResults).map(([k, v]) => {
         const label = LABELS[k] || { icon: '', title: k };
-        return `<div style="margin-bottom:24px">
-            <h3 style="color:#58a6ff;font-size:15px;margin:0 0 10px;padding-bottom:6px;border-bottom:1px solid #30363d">${label.icon} ${label.title}</h3>
-            <div style="color:#c9d1d9;font-size:13px;line-height:1.7;white-space:pre-wrap">${v}</div>
+        return `<div style="margin-bottom:28px;padding-bottom:20px;border-bottom:1px solid #30363d">
+            <h3 style="color:#58a6ff;font-size:15px;margin:0 0 12px;padding-bottom:6px;border-bottom:1px solid #21262d">${label.icon} ${label.title}</h3>
+            <div style="color:#c9d1d9;font-size:13px;line-height:1.7">${formatMarkdown(v)}</div>
         </div>`;
     }).join('');
 
@@ -610,7 +616,7 @@ async function sendReportEmail() {
             btn.textContent = '✓ Sent';
             setTimeout(() => closeEmailModal(), 2500);
         } else {
-            throw new Error(data.error || 'Send failed');
+            throw new Error(typeof data.error === 'string' ? data.error : JSON.stringify(data.error) || 'Send failed');
         }
     } catch (e) {
         status.style.color = 'var(--red)';
