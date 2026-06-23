@@ -624,32 +624,74 @@ function showToast(msg) { const t=document.createElement('div'); t.textContent=m
 
 // Markdown
 function formatMarkdown(text) {
+    // Use a proper markdown renderer
     const lines = text.split('\n');
-    let html='',inTable=false;
-    for (let i=0;i<lines.length;i++) {
-        const line=lines[i];
-        const isRow=line.trim().startsWith('|')&&line.trim().endsWith('|');
-        const isSep=/^\|[\s\-:|]+\|$/.test(line.trim());
-        if (isRow&&!isSep) {
-            if (!inTable){html+='<table>';inTable=true;}
-            const cells=line.split('|').slice(1,-1);
-            const isH=i+1<lines.length&&/^\|[\s\-:|]+\|$/.test(lines[i+1]?.trim());
-            const tag=isH?'th':'td';
-            html+='<tr>'+cells.map(c=>`<${tag}>${esc(c.trim())}</${tag}>`).join('')+'</tr>';
-        } else if(isSep){} else {
-            if(inTable){html+='</table>';inTable=false;}
-            let l=esc(line);
-            l=l.replace(/^## (.+)$/,'<h3>$1</h3>');
-            l=l.replace(/^### (.+)$/,'<h3 style="font-size:0.83rem">$1</h3>');
-            l=l.replace(/^# (.+)$/,'<h3>$1</h3>');
-            l=l.replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>');
-            if(/^[-*] /.test(l)) l='<li>'+l.replace(/^[-*] /,'')+'</li>';
-            else if(/^\d+\. /.test(l)) l='<li>'+l.replace(/^\d+\. /,'')+'</li>';
-            else if(l.trim()==='') l='<br>';
-            html+=l+'\n';
+    let html = '', inTable = false, inList = false;
+
+    const inline = (t) => {
+        // escape HTML first
+        t = t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+        // bold + italic
+        t = t.replace(/\*\*\*(.+?)\*\*\*/g,'<strong><em>$1</em></strong>');
+        t = t.replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>');
+        t = t.replace(/__(.+?)__/g,'<strong>$1</strong>');
+        t = t.replace(/\*(.+?)\*/g,'<em>$1</em>');
+        t = t.replace(/_([^_]+)_/g,'<em>$1</em>');
+        // inline code
+        t = t.replace(/`([^`]+)`/g,'<code style="background:#161b22;padding:1px 5px;border-radius:3px;font-size:0.85em">$1</code>');
+        // links [text](url)
+        t = t.replace(/\[([^\]]+)\]\(([^)]+)\)/g,'<a href="$2" target="_blank" style="color:#58a6ff">$1</a>');
+        return t;
+    };
+
+    for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+        const trimmed = line.trim();
+        const isRow = trimmed.startsWith('|') && trimmed.endsWith('|');
+        const isSep = /^\|[\s\-:|]+\|$/.test(trimmed);
+
+        if (isRow && !isSep) {
+            if (inList) { html += '</ul>'; inList = false; }
+            if (!inTable) { html += '<table>'; inTable = true; }
+            const cells = trimmed.split('|').slice(1, -1);
+            const isHeader = i + 1 < lines.length && /^\|[\s\-:|]+\|$/.test(lines[i+1]?.trim());
+            const tag = isHeader ? 'th' : 'td';
+            html += '<tr>' + cells.map(c => `<${tag}>${inline(c.trim())}</${tag}>`).join('') + '</tr>';
+        } else if (isSep) {
+            // skip separator rows
+        } else {
+            if (inTable) { html += '</table>'; inTable = false; }
+
+            // headings
+            if (/^#### (.+)/.test(trimmed)) {
+                if (inList) { html += '</ul>'; inList = false; }
+                html += `<h4 style="color:#e6edf3;font-size:0.8rem;margin:12px 0 4px;text-transform:uppercase;letter-spacing:0.05em;opacity:0.7">${inline(trimmed.slice(5))}</h4>`;
+            } else if (/^### (.+)/.test(trimmed)) {
+                if (inList) { html += '</ul>'; inList = false; }
+                html += `<h4 style="color:#e6edf3;font-size:0.85rem;margin:14px 0 6px">${inline(trimmed.slice(4))}</h4>`;
+            } else if (/^## (.+)/.test(trimmed)) {
+                if (inList) { html += '</ul>'; inList = false; }
+                html += `<h3 style="color:#e6edf3;font-size:0.95rem;margin:18px 0 8px;border-bottom:1px solid #21262d;padding-bottom:6px">${inline(trimmed.slice(3))}</h3>`;
+            } else if (/^# (.+)/.test(trimmed)) {
+                if (inList) { html += '</ul>'; inList = false; }
+                html += `<h2 style="color:#e6edf3;font-size:1.05rem;margin:20px 0 10px">${inline(trimmed.slice(2))}</h2>`;
+            } else if (/^[-*] (.+)/.test(trimmed)) {
+                if (!inList) { html += '<ul style="margin:6px 0;padding-left:20px">'; inList = true; }
+                html += `<li style="margin:3px 0;color:#c9d1d9">${inline(trimmed.slice(2))}</li>`;
+            } else if (/^\d+\. (.+)/.test(trimmed)) {
+                if (inList) { html += '</ul>'; inList = false; }
+                html += `<li style="margin:3px 0;color:#c9d1d9">${inline(trimmed.replace(/^\d+\. /,''))}</li>`;
+            } else if (trimmed === '' || trimmed === '---') {
+                if (inList) { html += '</ul>'; inList = false; }
+                html += trimmed === '---' ? '<hr style="border-color:#21262d;margin:12px 0">' : '<br>';
+            } else {
+                if (inList) { html += '</ul>'; inList = false; }
+                html += `<p style="margin:4px 0;color:#c9d1d9;line-height:1.6">${inline(trimmed)}</p>`;
+            }
         }
     }
-    if(inTable)html+='</table>';
+    if (inTable) html += '</table>';
+    if (inList) html += '</ul>';
     return html;
 }
 function esc(t){return t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
