@@ -275,18 +275,43 @@ async function runAnalysis(type) {
 
     try {
         const res = await fetch(API_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({analysis_type:type,messages})});
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error?.message||'API error');
-        const content = data.choices[0].message.content;
-        const citations = data.citations||[];
-        analysisResults[type] = content;
+        if (!res.ok) { const d=await res.json(); throw new Error(d.error?.message||'API error'); }
 
+        // Set up streaming card body
+        let visualHtml = '';
+        if (type==='market_sizing') visualHtml = renderTAMVisual('');
+        if (type==='swot') visualHtml = renderSWOTGrid('');
+        card.innerHTML = `<div class="card-header"><div class="card-header-left">${LABELS[type].icon} ${LABELS[type].title}</div></div><div class="card-body">${visualHtml}<div id="stream-${type}" style="white-space:pre-wrap;font-size:0.85rem;line-height:1.8"></div></div>`;
+        const streamEl = document.getElementById(`stream-${type}`);
+
+        let content = '';
+        let citations = [];
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let buf = '';
+
+        while (true) {
+            const {done, value} = await reader.read();
+            if (done) break;
+            buf += decoder.decode(value, {stream: true});
+            const lines = buf.split('\n');
+            buf = lines.pop();
+            for (const line of lines) {
+                if (!line.startsWith('data: ')) continue;
+                try {
+                    const ev = JSON.parse(line.slice(6));
+                    if (ev.type === 'citations') { citations = ev.citations || []; }
+                    if (ev.type === 'text') {
+                        content += ev.text;
+                        streamEl.innerHTML = formatMarkdown(content);
+                    }
+                } catch(e) {}
+            }
+        }
+
+        analysisResults[type] = content;
         let citHtml = '';
         if (citations.length) citHtml = `<div style="margin-top:1rem;padding-top:0.7rem;border-top:1px solid var(--border);font-size:0.7rem;color:var(--text-dim)"><strong style="color:var(--accent)">Sources:</strong><ol style="margin:0.3rem 0 0 1rem">${citations.map(c=>`<li><a href="${c}" target="_blank" style="color:var(--text-dim)">${c.replace(/^https?:\/\/(www\.)?/,'').slice(0,55)}...</a></li>`).join('')}</ol></div>`;
-
-        let visualHtml = '';
-        if (type==='market_sizing') visualHtml = renderTAMVisual(content);
-        if (type==='swot') visualHtml = renderSWOTGrid(content);
 
         card.innerHTML = `<div class="card-header"><div class="card-header-left">${LABELS[type].icon} ${LABELS[type].title}</div><div class="card-actions"><button onclick="goDeeper('${type}')">🔍 Deeper</button><button onclick="copyCard('${type}')">📋</button></div></div><div class="card-body">${visualHtml}${formatMarkdown(content)}${citHtml}</div>`;
     } catch(e) {
@@ -360,10 +385,20 @@ async function runCustom() {
 
     try {
         const res = await fetch(API_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({analysis_type:'custom',messages:[{role:'system',content:`You are a senior strategy consultant. Apply the "${fw}" framework. Output structured analysis with tables. No introductions.`},{role:'user',content:`Context: ${ctx}\n\n${input}`}]})});
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error?.message||'API error');
-        const content = data.choices[0].message.content;
-        const citations = data.citations||[];
+        if (!res.ok) { const d=await res.json(); throw new Error(d.error?.message||'API error'); }
+        card.innerHTML = `<div class="card-header"><div class="card-header-left">🔧 ${fw}</div></div><div class="card-body"><div id="stream-custom" style="white-space:pre-wrap;font-size:0.85rem;line-height:1.8"></div></div>`;
+        const streamEl = document.getElementById('stream-custom');
+        let content = ''; let citations = [];
+        const reader = res.body.getReader(); const decoder = new TextDecoder(); let buf = '';
+        while (true) {
+            const {done, value} = await reader.read(); if (done) break;
+            buf += decoder.decode(value, {stream:true});
+            const lines = buf.split('\n'); buf = lines.pop();
+            for (const line of lines) {
+                if (!line.startsWith('data: ')) continue;
+                try { const ev=JSON.parse(line.slice(6)); if(ev.type==='citations'){citations=ev.citations||[];} if(ev.type==='text'){content+=ev.text;streamEl.innerHTML=formatMarkdown(content);} } catch(e){}
+            }
+        }
         let citHtml = citations.length?`<div style="margin-top:1rem;padding-top:0.7rem;border-top:1px solid var(--border);font-size:0.7rem;color:var(--text-dim)"><strong style="color:var(--accent)">Sources:</strong><ol style="margin:0.3rem 0 0 1rem">${citations.map(c=>`<li><a href="${c}" target="_blank" style="color:var(--text-dim)">${c.replace(/^https?:\/\/(www\.)?/,'').slice(0,55)}</a></li>`).join('')}</ol></div>`:'';
         card.innerHTML = `<div class="card-header"><div class="card-header-left">🔧 ${fw}</div><div class="card-actions"><button onclick="navigator.clipboard.writeText(\`${content.replace(/`/g,'')}\`);showToast('Copied')">📋</button></div></div><div class="card-body">${formatMarkdown(content)}${citHtml}</div>`;
     } catch(e) { card.innerHTML = `<div class="card-header"><div class="card-header-left">🔧 ${fw}</div></div><div class="card-body" style="color:var(--red)">Error: ${e.message}</div>`; }
@@ -388,10 +423,20 @@ async function runComparison() {
 
     try {
         const res = await fetch(API_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({analysis_type:'comparison',messages:[{role:'system',content:`You are a senior strategy consultant. ${prompt} No introductions. Start directly with tables.`},{role:'user',content:`BUSINESS A:\n${a}\n\n---\n\nBUSINESS B:\n${b}`}]})});
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error?.message||'API error');
-        const content = data.choices[0].message.content;
-        const citations = data.citations||[];
+        if (!res.ok) { const d=await res.json(); throw new Error(d.error?.message||'API error'); }
+        card.innerHTML = `<div class="card-header"><div class="card-header-left">⚖️ Comparison Analysis</div></div><div class="card-body"><div id="stream-comparison" style="white-space:pre-wrap;font-size:0.85rem;line-height:1.8"></div></div>`;
+        const streamEl = document.getElementById('stream-comparison');
+        let content = ''; let citations = [];
+        const reader = res.body.getReader(); const decoder = new TextDecoder(); let buf = '';
+        while (true) {
+            const {done, value} = await reader.read(); if (done) break;
+            buf += decoder.decode(value, {stream:true});
+            const lines = buf.split('\n'); buf = lines.pop();
+            for (const line of lines) {
+                if (!line.startsWith('data: ')) continue;
+                try { const ev=JSON.parse(line.slice(6)); if(ev.type==='citations'){citations=ev.citations||[];} if(ev.type==='text'){content+=ev.text;streamEl.innerHTML=formatMarkdown(content);} } catch(e){}
+            }
+        }
         let citHtml = citations.length?`<div style="margin-top:1rem;padding-top:0.7rem;border-top:1px solid var(--border);font-size:0.7rem;color:var(--text-dim)"><strong style="color:var(--accent)">Sources:</strong><ol style="margin:0.3rem 0 0 1rem">${citations.map(c=>`<li><a href="${c}" target="_blank" style="color:var(--text-dim)">${c.replace(/^https?:\/\/(www\.)?/,'').slice(0,55)}</a></li>`).join('')}</ol></div>`:'';
         card.innerHTML = `<div class="card-header"><div class="card-header-left">⚖️ Comparison: ${LABELS[fw]?.title||'Full Strategic'}</div><div class="card-actions"><button onclick="navigator.clipboard.writeText(document.querySelector('#compare-results .card-body').innerText);showToast('Copied')">📋</button></div></div><div class="card-body">${formatMarkdown(content)}${citHtml}</div>`;
     } catch(e) { card.innerHTML = `<div class="card-header"><div class="card-header-left">⚖️ Comparison</div></div><div class="card-body" style="color:var(--red)">Error: ${e.message}</div>`; }
@@ -423,10 +468,20 @@ async function goDeeper(type) {
 
     try {
         const res = await fetch(API_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({analysis_type:type+'_deep',messages:[{role:'system',content:`Review this analysis. Challenge assumptions. Cite specific data sources. Narrow estimates. Rate confidence 1-10.\n\nPrevious:\n${original}`},{role:'user',content:`Context: ${ctx}\n${input}`}]})});
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error?.message||'API error');
-        const content = data.choices[0].message.content;
-        const citations = data.citations||[];
+        if (!res.ok) { const d=await res.json(); throw new Error(d.error?.message||'API error'); }
+        card.innerHTML = `<div class="card-header"><div class="card-header-left">🔍 ${LABELS[type].title} — Deep Dive</div></div><div class="card-body"><div id="stream-${type}-deep" style="white-space:pre-wrap;font-size:0.85rem;line-height:1.8"></div></div>`;
+        const streamEl = document.getElementById(`stream-${type}-deep`);
+        let content = ''; let citations = [];
+        const reader = res.body.getReader(); const decoder = new TextDecoder(); let buf = '';
+        while (true) {
+            const {done, value} = await reader.read(); if (done) break;
+            buf += decoder.decode(value, {stream:true});
+            const lines = buf.split('\n'); buf = lines.pop();
+            for (const line of lines) {
+                if (!line.startsWith('data: ')) continue;
+                try { const ev=JSON.parse(line.slice(6)); if(ev.type==='citations'){citations=ev.citations||[];} if(ev.type==='text'){content+=ev.text;streamEl.innerHTML=formatMarkdown(content);} } catch(e){}
+            }
+        }
         analysisResults[type+'_deep'] = content;
         let citHtml = citations.length?`<div style="margin-top:1rem;padding-top:0.7rem;border-top:1px solid var(--border);font-size:0.7rem;color:var(--text-dim)"><strong style="color:var(--accent)">Sources:</strong><ol style="margin:0.3rem 0 0 1rem">${citations.map(c=>`<li><a href="${c}" target="_blank" style="color:var(--text-dim)">${c.replace(/^https?:\/\/(www\.)?/,'').slice(0,55)}</a></li>`).join('')}</ol></div>`:'';
         card.innerHTML = `<div class="card-header"><div class="card-header-left">🔍 Deep Dive</div><div class="card-actions"><button onclick="copyCard('${type}_deep')">📋</button></div></div><div class="card-body">${formatMarkdown(content)}${citHtml}</div>`;
